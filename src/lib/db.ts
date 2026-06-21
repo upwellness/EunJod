@@ -165,6 +165,35 @@ export async function getBudgets(ledgerId: string): Promise<BudgetRow[]> {
   return (data as BudgetRow[]) ?? [];
 }
 
+// ── Category management (ต่อบัญชี) ───────────────────────────────────────────
+export async function updateLedgerSettings(ledgerId: string, settings: Record<string, unknown>): Promise<void> {
+  await db().from("ledgers").update({ settings }).eq("id", ledgerId);
+}
+
+/** เปลี่ยนชื่อหมวด: อัปเดตรายการ/คำที่เรียนรู้/งบ ที่ใช้ชื่อเดิม → ชื่อใหม่ */
+export async function renameCatBulk(ledgerId: string, oldName: string, newName: string): Promise<void> {
+  await db().from("transactions").update({ cat: newName }).eq("ledger_id", ledgerId).eq("cat", oldName);
+  await db().from("keywords").update({ cat: newName }).eq("ledger_id", ledgerId).eq("cat", oldName);
+  await db().from("budgets").update({ cat: newName }).eq("ledger_id", ledgerId).eq("cat", oldName);
+}
+
+/** ย้ายรายการทั้งหมดจากหมวดหนึ่งไปอีกหมวด (ล้างหมวดย่อย) */
+export async function moveCatBulk(ledgerId: string, fromCat: string, toCat: string): Promise<void> {
+  await db().from("transactions").update({ cat: toCat, sub: null }).eq("ledger_id", ledgerId).eq("cat", fromCat);
+  await db().from("keywords").update({ cat: toCat, sub: null }).eq("ledger_id", ledgerId).eq("cat", fromCat);
+}
+
+/** จำนวนรายการต่อหมวด (ที่ยังไม่ลบ) — โชว์ในหน้าจัดการ */
+export async function usedCategories(ledgerId: string): Promise<Record<string, number>> {
+  const { data } = await db().from("transactions").select("cat").eq("ledger_id", ledgerId).is("deleted_at", null);
+  const counts: Record<string, number> = {};
+  for (const r of (data as { cat: string | null }[]) ?? []) {
+    const c = r.cat ?? "อื่นๆ";
+    counts[c] = (counts[c] ?? 0) + 1;
+  }
+  return counts;
+}
+
 // ── Report token (ลิงก์เว็บ) ────────────────────────────────────────────────────
 export async function createReportToken(ledgerId: string): Promise<string> {
   const token = (globalThis.crypto?.randomUUID?.() ?? `${ledgerId}-${Math.round(performance.now())}`).replace(/-/g, "");

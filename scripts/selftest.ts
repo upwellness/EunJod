@@ -7,6 +7,7 @@
 import { parseMessage } from "../src/lib/parser";
 import { SEED } from "../src/data/categories.seed";
 import { buildDictionary, categorizeLocal, fallbackCat, catLabel, categoriesSummary, categoryGroups } from "../src/lib/categorize";
+import { readConfig, applyRename, effectiveGroups, summaryFromGroups, type CatConfig } from "../src/lib/categories";
 
 const dict = buildDictionary(SEED);
 let pass = 0;
@@ -117,6 +118,22 @@ console.log("\n[5] บันทึกย้อนหลังวัน (date par
 
   const e = parseMessage("กาแฟ 50")[0];
   check("'กาแฟ 50' (ไม่มีวัน) -> date = undefined", !!e && e.date === undefined, e);
+}
+
+console.log("\n[6] จัดการหมวด (rename/add/hide)");
+{
+  check("applyRename ต่อทอด A→B→C", applyRename("A", { A: "B", B: "C" }) === "C");
+  const cfg: CatConfig = {
+    renames: { กิน: "กินดื่ม" },
+    added: [{ type: "expense", cat: "ลงทุน", sub: null }],
+    hidden: ["บันเทิง"],
+  };
+  const g = effectiveGroups(SEED, cfg);
+  check("rename: มี 'กินดื่ม' ไม่มี 'กิน'", g.some((x) => x.cat === "กินดื่ม") && !g.some((x) => x.cat === "กิน"));
+  check("add: มีหมวด 'ลงทุน'", g.some((x) => x.cat === "ลงทุน" && x.type === "expense"));
+  check("hide: ไม่มี 'บันเทิง'", !g.some((x) => x.cat === "บันเทิง"));
+  check("summaryFromGroups โชว์ชื่อใหม่", summaryFromGroups(g).includes("กินดื่ม"));
+  check("readConfig ค่าว่าง -> empty", readConfig({}).added.length === 0 && Object.keys(readConfig(undefined).renames).length === 0);
 }
 
 console.log(`\n=========== ผลรวม: ${pass} ผ่าน / ${fail} ตก ===========\n`);

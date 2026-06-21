@@ -4,7 +4,8 @@
 // ───────────────────────────────────────────────────────────────────────────
 import { parseMessage, type TxType } from "./parser";
 import { SEED } from "@/data/categories.seed";
-import { buildDictionary, categorizeLocal, fallbackCat, normalize, catLabel, categoriesSummary, type CatRef } from "./categorize";
+import { buildDictionary, categorizeLocal, fallbackCat, normalize, catLabel, type CatRef } from "./categorize";
+import { readConfig, effectiveGroups, summaryFromGroups, applyRename } from "./categories";
 import { llmCategorize } from "./anthropic";
 import { signed, formatTHB } from "./money";
 import { text, DEFAULT_QUICK, type LineMessage } from "./line";
@@ -25,19 +26,29 @@ export interface MsgInput {
 const m = (s: string, quick?: { label: string; text: string }[]): LineMessage => text(s, quick);
 
 // ── จัดหมวดแบบเต็ม (DB เรียนรู้ → พจนานุกรม → Claude → อื่นๆ) ───────────────────
-async function resolveCategory(ledgerId: string, item: string, type: TxType): Promise<CatRef & { source: string }> {
+async function resolveCategory(ledger: Ledger, item: string, type: TxType): Promise<CatRef & { source: string }> {
+  const renames = readConfig(ledger.settings).renames;
+  const ledgerId = ledger.id;
+  let res: CatRef & { source: string };
+
   const learned = await repo.findLedgerKeyword(ledgerId, item, type);
-  if (learned) return { type, cat: learned.cat, sub: learned.sub, emoji: learned.emoji || "🏷️", source: "user" };
-
-  const local = categorizeLocal(item, type, DICT);
-  if (local) return { ...local, source: "dict" };
-
-  const llm = await llmCategorize(item, type);
-  if (llm) {
-    await repo.learnKeyword(ledgerId, item, type, llm.cat, llm.sub, "llm").catch(() => {});
-    return { type, cat: llm.cat, sub: llm.sub, emoji: "🏷️", source: "llm" };
+  if (learned) {
+    res = { type, cat: learned.cat, sub: learned.sub, emoji: learned.emoji || "🏷️", source: "user" };
+  } else {
+    const local = categorizeLocal(item, type, DICT);
+    if (local) {
+      res = { ...local, source: "dict" };
+    } else {
+      const llm = await llmCategorize(item, type);
+      res = llm
+        ? { type, cat: llm.cat, sub: llm.sub, emoji: "🏷️", source: "llm" }
+        : { ...fallbackCat(type), source: "fallback" };
+    }
   }
-  return { ...fallbackCat(type), source: "fallback" };
+
+  res.cat = applyRename(res.cat, renames); // ใช้ชื่อหมวดที่ผู้ใช้เปลี่ยนไว้
+  if (res.source === "llm") await repo.learnKeyword(ledgerId, item, type, res.cat, res.sub, "llm").catch(() => {});
+  return res;
 }
 
 function parseCatPath(s: string): { cat: string; sub: string | null } {
@@ -56,10 +67,8 @@ export async function handleText(input: MsgInput): Promise<LineMessage[] | null>
   const lower = t.toLowerCase();
   if (!t) return null;
 
-  // /help + /cats ใช้ได้ทุกที่ (ไม่ต้องมีบัญชีก่อน)
+  // /help ใช้ได้ทุกที่ (ไม่ต้องมีบัญชีก่อน)
   if (lower === "/help" || lower === "help" || t === "ช่วยเหลือ") return [helpMessage()];
-  if (lower === "/cats" || lower === "/categories" || t === "หมวด" || t === "หมวดหมู่" || t === "หมวดทั้งหมด" || t === "ดูหมวด")
-    return [m(categoriesSummary(SEED), DEFAULT_QUICK)];
 
   // /setbook — ตั้งบัญชี (ทำได้แม้ยังไม่มีบัญชี)
   if (lower.startsWith("/setbook")) {
@@ -91,6 +100,10 @@ export async function handleText(input: MsgInput): Promise<LineMessage[] | null>
   if (t === "สรุป") return [await report(ledger, "month")];
   if (t === "รายงาน") return [await report(ledger, "month", true)];
   if (lower === "/review" || t === "รีวิว" || t === "จัดหมวด" || t === "ตรวจหมวด") return [await handleReview(ledger)];
+  if (lower === "/cats" || lower === "/categories" || t === "หมวด" || t === "หมวดหมู่" || t === "หมวดทั้งหมด" || t === "ดูหมวด")
+    return [m(summaryFromGroups(effectiveGroups(SEED, readConfig(ledger.settings))), DEFAULT_QUICK)];
+  if (lower === "/editcat" || lower === "/managecat" || t === "จัดการหมวด" || t === "แก้ชื่อหมวด")
+    return [await handleEditCat(ledger)];
 
   if (lower === "/book" || t === "บัญชี") return [await handleBook(ledger)];
   if (t === "งบ" || lower === "/budget" || lower === "budget") {
@@ -114,7 +127,7 @@ async function handleRecord(ledger: Ledger, input: MsgInput): Promise<LineMessag
 
   const recorded: { item: string; type: TxType; amount: number; ref: CatRef & { source: string }; occurredAt?: string }[] = [];
   for (const e of entries) {
-    const ref = await resolveCategory(ledger.id, e.item, e.type);
+    const ref = await resolveCategory(ledger, e.item, e.type);
     const occurredAt = e.date ? makeOccurredAt(ledger.timezone, e.date) : undefined;
     const row: Partial<TxRow> = {
       ledger_id: ledger.id,
@@ -205,10 +218,31 @@ async function handleSetBudget(ledger: Ledger, t: string): Promise<LineMessage> 
   const rest = t.replace(/^\/budget/i, "").trim();
   const parts = rest.split(/\s+/);
   const amount = parseFloat((parts.pop() || "").replace(/[, ]/g, ""));
-  const cat = parts.join(" ").trim();
-  if (!cat || !isFinite(amount)) return m("พิมพ์  /budget <หมวด> <จำนวน>  เช่น  /budget กิน 5000\n\n" + categoriesSummary(SEED));
+  let cat = parts.join(" ").trim();
+  if (!cat || !isFinite(amount)) {
+    const cats = summaryFromGroups(effectiveGroups(SEED, readConfig(ledger.settings)));
+    return m("พิมพ์  /budget <หมวด> <จำนวน>  เช่น  /budget กิน 5000\n\n" + cats);
+  }
+  cat = applyRename(cat, readConfig(ledger.settings).renames);
   await repo.setBudget(ledger.id, cat, amount);
   return m(`💰 ตั้งงบ "${cat}" = ${formatTHB(amount)} บาท/เดือน แล้ว`);
+}
+
+async function handleEditCat(ledger: Ledger): Promise<LineMessage> {
+  let link = "";
+  try {
+    const token = await repo.createReportToken(ledger.id);
+    const base = process.env.APP_BASE_URL || "";
+    if (base) link = `${base}/categories/${token}`;
+  } catch {
+    /* ไม่มีลิงก์ก็แจ้งได้ */
+  }
+  return m(
+    link
+      ? `🗂️ จัดการหมวด (เปลี่ยนชื่อ · เพิ่ม · ซ่อน · ย้าย) — กดลิงก์:\n${link}`
+      : "🗂️ จัดการหมวดผ่านหน้าเว็บ — ระบบยังสร้างลิงก์ไม่ได้ตอนนี้",
+    DEFAULT_QUICK,
+  );
 }
 
 async function handleBudgetStatus(ledger: Ledger): Promise<LineMessage> {
@@ -297,6 +331,7 @@ function helpMessage(): LineMessage {
       "📊 ดู: วันนี้ · เดือนนี้ · รายงาน · งบ",
       "   หมวด กิน · ค้นหา กาแฟ · /cats (ดูหมวดทั้งหมด)",
       "🏷️ /review — จัดหมวดรายการที่ยังไม่รู้ (อื่นๆ)",
+      "🗂️ /editcat — จัดการหมวด (เปลี่ยนชื่อ/เพิ่ม/ซ่อน/ย้าย)",
       "",
       "⚙️ ตั้งค่า:",
       "   /setbook ชื่อบัญชี",

@@ -1,7 +1,7 @@
-import { ledgerByToken, uncategorizedTx } from "@/lib/db";
+import { ledgerByToken, usedCategories } from "@/lib/db";
 import { SEED } from "@/data/categories.seed";
 import { effectiveGroups, readConfig } from "@/lib/categories";
-import ReviewList from "./ReviewList";
+import CategoryManager from "./CategoryManager";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ function Box({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function ReviewPage({ params }: { params: { token: string } }) {
+export default async function CategoriesPage({ params }: { params: { token: string } }) {
   let ledger;
   try {
     ledger = await ledgerByToken(params.token);
@@ -24,18 +24,17 @@ export default async function ReviewPage({ params }: { params: { token: string }
   }
   if (!ledger) return <Box>🔒 ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว</Box>;
 
-  const txs = await uncategorizedTx(ledger.id);
-  const groups = effectiveGroups(SEED, readConfig(ledger.settings));
-  const items = txs.map((t) => ({
-    id: t.id,
-    item: t.item,
-    type: t.type,
-    amount: Number(t.amount),
-    note: t.note,
-    occurred_at: t.occurred_at,
-  }));
+  const config = readConfig(ledger.settings);
+  const groups = effectiveGroups(SEED, config);
+  const used = await usedCategories(ledger.id);
 
   return (
-    <ReviewList token={params.token} ledgerName={ledger.name} items={items} groups={groups} />
+    <CategoryManager
+      token={params.token}
+      ledgerName={ledger.name}
+      groups={groups}
+      hidden={config.hidden}
+      used={used}
+    />
   );
 }
