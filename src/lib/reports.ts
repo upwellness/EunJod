@@ -1,5 +1,6 @@
 // reports.ts — ช่วงเวลา (ตาม timezone) + สรุปยอด + จัดรูปแบบข้อความ
 import type { TxRow } from "./types";
+import type { DateHint } from "./parser";
 import { formatTHB } from "./money";
 
 export type RangeKind = "today" | "yesterday" | "month" | "lastmonth";
@@ -36,6 +37,34 @@ export function localRange(tz: string, kind: RangeKind): Range {
     case "month": return { start: mk(y, m, 1), end: mk(y, m + 1, 1), label: `เดือนนี้ (${m}/${y})` };
     case "lastmonth": return { start: mk(y, m - 1, 1), end: mk(y, m, 1), label: `เดือนที่แล้ว (${m - 1 || 12}/${m - 1 ? y : y - 1})` };
   }
+}
+
+function normYear(y: number): number {
+  if (y < 100) y += 2500; // 68 -> 2568 (พ.ศ. ย่อ)
+  if (y >= 2500) y -= 543; // พ.ศ. -> ค.ศ.
+  return y;
+}
+
+/** แปลงคำใบ้วันที่ -> occurred_at (ISO) ตาม timezone (คงเวลาปัจจุบันของวันไว้เพื่อลำดับที่ถูก) */
+export function makeOccurredAt(tz: string, hint: DateHint): string {
+  const now = new Date();
+  const off = offsetMs(tz, now);
+  const p = parts(tz, now);
+  const hh = +p.hour, mi = +p.minute;
+  let y = +p.year, mo = +p.month, d = +p.day;
+  if (hint.kind === "relative") {
+    d = d + hint.days;
+  } else {
+    d = hint.d;
+    mo = hint.m;
+    y = hint.y == null ? y : normYear(hint.y);
+  }
+  return new Date(Date.UTC(y, mo - 1, d, hh, mi, 0) - off).toISOString();
+}
+
+/** วันที่แบบไทยสั้น เช่น "12 มิ.ย." */
+export function thaiDate(tz: string, iso: string): string {
+  return new Date(iso).toLocaleDateString("th-TH", { timeZone: tz, day: "numeric", month: "short" });
 }
 
 export interface Summary {

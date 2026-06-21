@@ -5,12 +5,18 @@
 
 export type TxType = "income" | "expense";
 
+/** คำใบ้วันที่ที่แยกได้จากข้อความ (ให้ commands แปลงเป็น occurred_at ตาม timezone) */
+export type DateHint =
+  | { kind: "relative"; days: number }
+  | { kind: "absolute"; d: number; m: number; y: number | null };
+
 export interface ParsedEntry {
   type: TxType;
   amount: number;
   item: string;
   note?: string;
   raw: string;
+  date?: DateHint;
 }
 
 /** คำที่บอกว่าเป็น "รายรับ" (นอกเหนือจากเครื่องหมาย +) */
@@ -66,6 +72,36 @@ function pickAmount(s: string): AmountHit | null {
   return { value: chosen.num * mult, start: chosen.start, end };
 }
 
+/** คำบอกวันแบบสัมพัทธ์ */
+const REL_WORDS: [RegExp, number][] = [
+  [/(?:เมื่อ)?วานซืน/, -2],
+  [/เมื่อวาน(?:นี้)?|วานนี้/, -1],
+  [/วันนี้/, 0],
+];
+
+/** แยกคำใบ้วันที่ออกจากข้อความ + คืนข้อความที่ตัดวันออกแล้ว */
+function extractDate(s: string): { hint?: DateHint; rest: string } {
+  // "N วันก่อน" / "N วันที่แล้ว"
+  let m = s.match(/(\d+)\s*วัน(?:ก่อน|ที่แล้ว)/);
+  if (m) return { hint: { kind: "relative", days: -parseInt(m[1], 10) }, rest: s.replace(m[0], " ") };
+
+  // คำบอกวัน (เมื่อวาน/วานซืน/วันนี้)
+  for (const [re, days] of REL_WORDS) {
+    const mm = s.match(re);
+    if (mm) return { hint: { kind: "relative", days }, rest: s.replace(mm[0], " ") };
+  }
+
+  // วันที่แบบ d/m หรือ d/m/yy(yy)  (มี "/" จึงไม่ชนกับจำนวนเงิน)
+  m = s.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+  if (m) {
+    const d = +m[1], mo = +m[2];
+    if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) {
+      return { hint: { kind: "absolute", d, m: mo, y: m[3] ? +m[3] : null }, rest: s.replace(m[0], " ") };
+    }
+  }
+  return { rest: s };
+}
+
 function parseSegment(seg: string): ParsedEntry | null {
   let work = seg;
   let note: string | undefined;
@@ -76,6 +112,10 @@ function parseSegment(seg: string): ParsedEntry | null {
     note = noteMatch[1].trim() || undefined;
     work = work.slice(0, noteMatch.index).trim();
   }
+
+  // วันที่ย้อนหลัง (ตัดออกก่อนหาจำนวนเงิน เพื่อไม่ให้เลขวันถูกอ่านเป็นยอด)
+  const { hint, rest } = extractDate(work);
+  work = rest;
 
   // เครื่องหมายกำหนดชนิดชัดเจน
   let force: TxType | undefined;
@@ -95,7 +135,7 @@ function parseSegment(seg: string): ParsedEntry | null {
   const hay = (item + " " + (note || "")).toLowerCase();
   const type: TxType = force ?? (INCOME_WORDS.some((w) => hay.includes(w)) ? "income" : "expense");
 
-  return { type, amount: amt.value, item, note, raw: seg.trim() };
+  return { type, amount: amt.value, item, note, raw: seg.trim(), date: hint };
 }
 
 /**

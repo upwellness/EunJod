@@ -8,9 +8,9 @@ import { buildDictionary, categorizeLocal, fallbackCat, normalize, catLabel, cat
 import { llmCategorize } from "./anthropic";
 import { signed, formatTHB } from "./money";
 import { text, DEFAULT_QUICK, type LineMessage } from "./line";
-import { localRange, aggregate, formatSummary, type RangeKind } from "./reports";
+import { localRange, aggregate, formatSummary, makeOccurredAt, thaiDate, type RangeKind } from "./reports";
 import * as repo from "./db";
-import type { Ledger } from "./types";
+import type { Ledger, TxRow } from "./types";
 
 const DICT = buildDictionary(SEED);
 
@@ -112,10 +112,11 @@ async function handleRecord(ledger: Ledger, input: MsgInput): Promise<LineMessag
   const entries = parseMessage(input.text);
   if (entries.length === 0) return null; // ไม่มีตัวเลขเงิน → เงียบ
 
-  const recorded: { item: string; type: TxType; amount: number; ref: CatRef & { source: string } }[] = [];
+  const recorded: { item: string; type: TxType; amount: number; ref: CatRef & { source: string }; occurredAt?: string }[] = [];
   for (const e of entries) {
     const ref = await resolveCategory(ledger.id, e.item, e.type);
-    await repo.insertTx({
+    const occurredAt = e.date ? makeOccurredAt(ledger.timezone, e.date) : undefined;
+    const row: Partial<TxRow> = {
       ledger_id: ledger.id,
       user_id: input.userId ?? null,
       type: e.type,
@@ -126,13 +127,17 @@ async function handleRecord(ledger: Ledger, input: MsgInput): Promise<LineMessag
       note: e.note ?? null,
       source_message_id: input.messageId ?? null,
       raw_text: e.raw,
-    });
-    recorded.push({ item: e.item, type: e.type, amount: e.amount, ref });
+    };
+    if (occurredAt) row.occurred_at = occurredAt;
+    await repo.insertTx(row);
+    recorded.push({ item: e.item, type: e.type, amount: e.amount, ref, occurredAt });
   }
+
+  const dateTag = (o?: string) => (o ? ` 📅 ${thaiDate(ledger.timezone, o)}` : "");
 
   if (recorded.length === 1) {
     const r = recorded[0];
-    let body = `✅ จด: ${r.item} ${signed(r.type, r.amount)} บาท\n${r.ref.emoji} ${catLabel(r.ref)}`;
+    let body = `✅ จด: ${r.item} ${signed(r.type, r.amount)} บาท${dateTag(r.occurredAt)}\n${r.ref.emoji} ${catLabel(r.ref)}`;
     if (r.ref.source === "fallback") body += `\n\n❓ ยังไม่รู้หมวด — สอนได้: แก้หมวด กิน > เครื่องดื่ม`;
     const budgetLine = r.type === "expense" ? await budgetHint(ledger, r.ref.cat) : "";
     if (budgetLine) body += `\n${budgetLine}`;
@@ -140,7 +145,7 @@ async function handleRecord(ledger: Ledger, input: MsgInput): Promise<LineMessag
   }
 
   // หลายรายการ
-  const lines = recorded.map((r) => `• ${r.item} ${signed(r.type, r.amount)} (${catLabel(r.ref)})`);
+  const lines = recorded.map((r) => `• ${r.item} ${signed(r.type, r.amount)} (${catLabel(r.ref)})${dateTag(r.occurredAt)}`);
   const inc = recorded.filter((r) => r.type === "income").reduce((s, r) => s + r.amount, 0);
   const exp = recorded.filter((r) => r.type === "expense").reduce((s, r) => s + r.amount, 0);
   const summary = `✅ จด ${recorded.length} รายการ\n${lines.join("\n")}\n\nรวมจ่าย −${formatTHB(exp)}${inc ? ` · รวมรับ +${formatTHB(inc)}` : ""}`;

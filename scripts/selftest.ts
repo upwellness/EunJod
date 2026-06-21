@@ -97,5 +97,27 @@ console.log("\n[4] รายการหมวด (/cats)");
   check("categoryGroups: มีกลุ่มรายรับ", g.some((x) => x.type === "income" && x.cat === "เงินเดือน"));
 }
 
+console.log("\n[5] บันทึกย้อนหลังวัน (date parsing)");
+{
+  const a = parseMessage("กาแฟ 50 เมื่อวาน")[0];
+  check("'กาแฟ 50 เมื่อวาน' -> เมื่อวาน(-1), จ่าย 50, item 'กาแฟ'",
+    !!a && !!a.date && a.date.kind === "relative" && a.date.days === -1 && a.amount === 50 && a.item === "กาแฟ", a);
+
+  const b = parseMessage("ข้าว 60 12/6")[0];
+  check("'ข้าว 60 12/6' -> 12/6, จ่าย 60, item 'ข้าว' (เลขวันไม่ปนยอด)",
+    !!b && !!b.date && b.date.kind === "absolute" && b.date.d === 12 && b.date.m === 6 && b.amount === 60 && b.item === "ข้าว", b);
+
+  const c = parseMessage("ค่าน้ำ 200 3วันก่อน")[0];
+  check("'ค่าน้ำ 200 3วันก่อน' -> -3 วัน, จ่าย 200",
+    !!c && !!c.date && c.date.kind === "relative" && c.date.days === -3 && c.amount === 200, c);
+
+  const d = parseMessage("เบียร์ 120 12/06/2025")[0];
+  check("'เบียร์ 120 12/06/2025' -> ปี 2025, จ่าย 120",
+    !!d && !!d.date && d.date.kind === "absolute" && d.date.y === 2025 && d.amount === 120, d);
+
+  const e = parseMessage("กาแฟ 50")[0];
+  check("'กาแฟ 50' (ไม่มีวัน) -> date = undefined", !!e && e.date === undefined, e);
+}
+
 console.log(`\n=========== ผลรวม: ${pass} ผ่าน / ${fail} ตก ===========\n`);
 if (fail > 0) process.exit(1);
