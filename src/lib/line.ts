@@ -11,7 +11,7 @@ export interface LineMessage {
   quickReply?: { items: { type: "action"; action: { type: "message"; label: string; text: string } }[] };
 }
 
-const LINE_API = "https://api.line.biz/v2/bot/message";
+const LINE_API = "https://api.line.me/v2/bot/message";
 
 /** ตรวจลายเซ็น X-Line-Signature (HMAC-SHA256 ด้วย channel secret) */
 export function verifySignature(rawBody: string, signature: string | null): boolean {
