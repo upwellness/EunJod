@@ -4,7 +4,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 import { parseMessage, type TxType } from "./parser";
 import { SEED } from "@/data/categories.seed";
-import { buildDictionary, categorizeLocal, fallbackCat, normalize, catLabel, type CatRef } from "./categorize";
+import { buildDictionary, categorizeLocal, fallbackCat, normalize, catLabel, categoriesSummary, type CatRef } from "./categorize";
 import { llmCategorize } from "./anthropic";
 import { signed, formatTHB } from "./money";
 import { text, DEFAULT_QUICK, type LineMessage } from "./line";
@@ -56,8 +56,10 @@ export async function handleText(input: MsgInput): Promise<LineMessage[] | null>
   const lower = t.toLowerCase();
   if (!t) return null;
 
-  // /help ใช้ได้ทุกที่
+  // /help + /cats ใช้ได้ทุกที่ (ไม่ต้องมีบัญชีก่อน)
   if (lower === "/help" || lower === "help" || t === "ช่วยเหลือ") return [helpMessage()];
+  if (lower === "/cats" || lower === "/categories" || t === "หมวด" || t === "หมวดหมู่" || t === "หมวดทั้งหมด" || t === "ดูหมวด")
+    return [m(categoriesSummary(SEED), DEFAULT_QUICK)];
 
   // /setbook — ตั้งบัญชี (ทำได้แม้ยังไม่มีบัญชี)
   if (lower.startsWith("/setbook")) {
@@ -198,7 +200,7 @@ async function handleSetBudget(ledger: Ledger, t: string): Promise<LineMessage> 
   const parts = rest.split(/\s+/);
   const amount = parseFloat((parts.pop() || "").replace(/[, ]/g, ""));
   const cat = parts.join(" ").trim();
-  if (!cat || !isFinite(amount)) return m("พิมพ์  /budget <หมวด> <จำนวน>  เช่น  /budget กิน 5000");
+  if (!cat || !isFinite(amount)) return m("พิมพ์  /budget <หมวด> <จำนวน>  เช่น  /budget กิน 5000\n\n" + categoriesSummary(SEED));
   await repo.setBudget(ledger.id, cat, amount);
   return m(`💰 ตั้งงบ "${cat}" = ${formatTHB(amount)} บาท/เดือน แล้ว`);
 }
@@ -269,7 +271,7 @@ function helpMessage(): LineMessage {
       "",
       "✏️ แก้: ลบ · แก้ 70 · แก้หมวด เดินทาง",
       "📊 ดู: วันนี้ · เดือนนี้ · รายงาน · งบ",
-      "   หมวด กิน · ค้นหา กาแฟ",
+      "   หมวด กิน · ค้นหา กาแฟ · /cats (ดูหมวดทั้งหมด)",
       "",
       "⚙️ ตั้งค่า:",
       "   /setbook ชื่อบัญชี",

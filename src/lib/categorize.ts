@@ -78,3 +78,27 @@ export function fallbackCat(type: TxType): CatRef {
 export function catLabel(ref: { cat: string; sub: string | null }): string {
   return ref.sub ? `${ref.cat} > ${ref.sub}` : ref.cat;
 }
+
+/** ข้อความสรุป "หมวดทั้งหมด" สำหรับ /cats และตอนช่วยตั้งงบ */
+export function categoriesSummary(seed: SeedEntry[]): string {
+  const group = (type: TxType) => {
+    const byCat = new Map<string, { emoji: string; subs: string[] }>();
+    for (const e of seed) {
+      if (e.type !== type) continue;
+      const g = byCat.get(e.cat) ?? { emoji: e.emoji, subs: [] };
+      if (e.sub) g.subs.push(e.sub);
+      byCat.set(e.cat, g);
+    }
+    return byCat;
+  };
+
+  const lines: string[] = ['📂 หมวดทั้งหมด (ตั้งงบใช้ชื่อ "หมวดใหญ่")', "", "— รายจ่าย —"];
+  for (const [cat, g] of group("expense")) {
+    lines.push(`${g.emoji} ${cat}${g.subs.length ? `\n   └ ${g.subs.join(" · ")}` : ""}`);
+  }
+  const inc: string[] = [];
+  for (const [cat, g] of group("income")) inc.push(`${g.emoji} ${cat}`);
+  lines.push("", "— รายรับ —", inc.join(" · "));
+  lines.push("", "💡 ตั้งงบ: /budget กิน 5000");
+  return lines.join("\n");
+}
