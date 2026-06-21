@@ -90,6 +90,7 @@ export async function handleText(input: MsgInput): Promise<LineMessage[] | null>
   if (t === "เมื่อวาน") return [await report(ledger, "yesterday")];
   if (t === "สรุป") return [await report(ledger, "month")];
   if (t === "รายงาน") return [await report(ledger, "month", true)];
+  if (lower === "/review" || t === "รีวิว" || t === "จัดหมวด" || t === "ตรวจหมวด") return [await handleReview(ledger)];
 
   if (lower === "/book" || t === "บัญชี") return [await handleBook(ledger)];
   if (t === "งบ" || lower === "/budget" || lower === "budget") {
@@ -241,6 +242,24 @@ async function report(ledger: Ledger, kind: RangeKind, withLink = false): Promis
   return m(formatSummary(r.label, ledger.name, s, link), DEFAULT_QUICK);
 }
 
+async function handleReview(ledger: Ledger): Promise<LineMessage> {
+  const txs = await repo.uncategorizedTx(ledger.id);
+  if (!txs.length) return m("เยี่ยม! ไม่มีรายการที่ยังไม่รู้หมวด 🎉");
+  let link = "";
+  try {
+    const token = await repo.createReportToken(ledger.id);
+    const base = process.env.APP_BASE_URL || "";
+    if (base) link = `${base}/review/${token}`;
+  } catch {
+    /* ไม่มีลิงก์ก็ยังบอกจำนวนได้ */
+  }
+  const head = `📋 มี ${txs.length} รายการที่ยังไม่รู้หมวด (ตอนนี้อยู่ในหมวด "อื่นๆ")`;
+  return m(
+    link ? `${head}\n\nกดลิงก์มาจัดหมวด — เลือกแล้วบอทจะจำให้ ครั้งหน้าจัดอัตโนมัติ:\n${link}` : head,
+    DEFAULT_QUICK,
+  );
+}
+
 async function handleCategoryDetail(ledger: Ledger, name: string): Promise<LineMessage> {
   if (!name) return m("พิมพ์  หมวด <ชื่อหมวด>  เช่น  หมวด กิน");
   const { start, end } = localRange(ledger.timezone, "month");
@@ -272,6 +291,7 @@ function helpMessage(): LineMessage {
       "✏️ แก้: ลบ · แก้ 70 · แก้หมวด เดินทาง",
       "📊 ดู: วันนี้ · เดือนนี้ · รายงาน · งบ",
       "   หมวด กิน · ค้นหา กาแฟ · /cats (ดูหมวดทั้งหมด)",
+      "🏷️ /review — จัดหมวดรายการที่ยังไม่รู้ (อื่นๆ)",
       "",
       "⚙️ ตั้งค่า:",
       "   /setbook ชื่อบัญชี",

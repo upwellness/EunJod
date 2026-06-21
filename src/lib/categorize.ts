@@ -79,6 +79,25 @@ export function catLabel(ref: { cat: string; sub: string | null }): string {
   return ref.sub ? `${ref.cat} > ${ref.sub}` : ref.cat;
 }
 
+export interface CatGroup {
+  type: TxType;
+  cat: string;
+  emoji: string;
+  subs: string[];
+}
+
+/** จัดกลุ่มหมวดจาก seed (สำหรับ dropdown หน้า Review) */
+export function categoryGroups(seed: SeedEntry[]): CatGroup[] {
+  const map = new Map<string, CatGroup>();
+  for (const e of seed) {
+    const key = `${e.type}:${e.cat}`;
+    const g = map.get(key) ?? { type: e.type, cat: e.cat, emoji: e.emoji, subs: [] };
+    if (e.sub) g.subs.push(e.sub);
+    map.set(key, g);
+  }
+  return [...map.values()];
+}
+
 /** ข้อความสรุป "หมวดทั้งหมด" สำหรับ /cats และตอนช่วยตั้งงบ */
 export function categoriesSummary(seed: SeedEntry[]): string {
   const group = (type: TxType) => {

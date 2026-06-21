@@ -97,6 +97,30 @@ export async function searchTx(ledgerId: string, term: string, limit = 15): Prom
   return (data as TxRow[]) ?? [];
 }
 
+/** รายการที่ยังไม่รู้หมวด (cat = "อื่นๆ" หรือว่าง) สำหรับหน้า Review */
+export async function uncategorizedTx(ledgerId: string, limit = 100): Promise<TxRow[]> {
+  const { data } = await db()
+    .from("transactions")
+    .select("*")
+    .eq("ledger_id", ledgerId)
+    .is("deleted_at", null)
+    .or("cat.eq.อื่นๆ,cat.is.null")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data as TxRow[]) ?? [];
+}
+
+/** ดึงรายการเฉพาะที่เป็นของ ledger นี้ (กันแก้ข้ามบัญชี) */
+export async function getTxForLedger(id: string, ledgerId: string): Promise<TxRow | null> {
+  const { data } = await db()
+    .from("transactions")
+    .select("*")
+    .eq("id", id)
+    .eq("ledger_id", ledgerId)
+    .maybeSingle();
+  return (data as TxRow) ?? null;
+}
+
 // ── Keywords (เรียนรู้ต่อกลุ่ม) ────────────────────────────────────────────────
 export async function findLedgerKeyword(
   ledgerId: string,

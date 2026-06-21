@@ -6,7 +6,7 @@
 
 import { parseMessage } from "../src/lib/parser";
 import { SEED } from "../src/data/categories.seed";
-import { buildDictionary, categorizeLocal, fallbackCat, catLabel, categoriesSummary } from "../src/lib/categorize";
+import { buildDictionary, categorizeLocal, fallbackCat, catLabel, categoriesSummary, categoryGroups } from "../src/lib/categorize";
 
 const dict = buildDictionary(SEED);
 let pass = 0;
@@ -90,6 +90,11 @@ console.log("\n[4] รายการหมวด (/cats)");
   check("มีหมวดใหญ่ครบ (กิน/เดินทาง/บ้าน/บิล)", s.includes("กิน") && s.includes("เดินทาง") && s.includes("บ้าน/บิล"));
   check("มีหมวดย่อย (เครื่องดื่ม/ทางด่วน)", s.includes("เครื่องดื่ม") && s.includes("ทางด่วน"));
   check("มีรายรับ (เงินเดือน) + ตัวอย่างตั้งงบ", s.includes("เงินเดือน") && s.includes("/budget"));
+
+  const g = categoryGroups(SEED);
+  const food = g.find((x) => x.cat === "กิน" && x.type === "expense");
+  check("categoryGroups: กิน มี 3 หมวดย่อย", !!food && food.subs.length === 3);
+  check("categoryGroups: มีกลุ่มรายรับ", g.some((x) => x.type === "income" && x.cat === "เงินเดือน"));
 }
 
 console.log(`\n=========== ผลรวม: ${pass} ผ่าน / ${fail} ตก ===========\n`);
