@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EunJod (น้องจด) — Spec ระบบ LINE Bot จดรายรับ-รายจ่าย</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          thai: ['"IBM Plex Sans Thai"', 'sans-serif'],
+          display: ['"Space Grotesk"', '"IBM Plex Sans Thai"', 'sans-serif'],
+        },
+        colors: {
+          jade: { 300:'#5eead4', 400:'#2dd4bf', 500:'#14b8a6', 600:'#0d9488' },
+          bronze: { 300:'#fcd34d', 400:'#fbbf24' },
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { background:#070b16; }
+  .glass { background: rgba(255,255,255,0.04); backdrop-filter: blur(16px); border:1px solid rgba(255,255,255,0.08); }
+  .glow { background:
+      radial-gradient(60rem 40rem at 15% -10%, rgba(20,184,166,0.16), transparent 60%),
+      radial-gradient(50rem 40rem at 110% 10%, rgba(251,191,36,0.10), transparent 55%),
+      #070b16; }
+  .nav-link.active { color:#5eead4; border-color:#2dd4bf; background:rgba(45,212,191,0.08); }
+  ::-webkit-scrollbar { width:10px; height:10px; } ::-webkit-scrollbar-thumb { background:#1e293b; border-radius:8px; }
+  .mermaid { background:transparent; }
+  .chip { transition:all .15s ease; }
+  details > summary { list-style:none; cursor:pointer; } details > summary::-webkit-details-marker { display:none; }
+</style>
+</head>
+<body class="glow text-slate-200 font-thai antialiased">
+
+<div class="mx-auto max-w-7xl px-4 lg:px-8 py-6 lg:grid lg:grid-cols-[230px_1fr] lg:gap-10">
+
+  <!-- ===== Sidebar nav ===== -->
+  <aside class="hidden lg:block">
+    <div class="sticky top-6">
+      <div class="flex items-center gap-2 mb-6">
+        <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-jade-400 to-jade-600 grid place-items-center text-lg shadow-lg shadow-jade-500/20">🧾</div>
+        <div>
+          <div class="font-display font-bold text-white leading-none">EunJod</div>
+          <div class="text-[11px] text-slate-400">น้องจด · Spec v0.2</div>
+        </div>
+      </div>
+      <nav class="space-y-1 text-sm">
+        <a data-nav="tldr"     class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">สรุป</a>
+        <a data-nav="problem"  class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">ปัญหา & เป้าหมาย</a>
+        <a data-nav="flow"     class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">การทำงาน</a>
+        <a data-nav="features" class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">ฟีเจอร์ (P0–P2)</a>
+        <a data-nav="functions"class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">ฟังก์ชันใช้งาน</a>
+        <a data-nav="taxonomy" class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">หมวดหมู่</a>
+        <a data-nav="arch"     class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">สถาปัตยกรรม & ข้อมูล</a>
+        <a data-nav="roadmap"  class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">โรดแมป</a>
+        <a data-nav="decisions"class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">การตัดสินใจ & เสี่ยง</a>
+        <a data-nav="next"     class="nav-link block rounded-lg px-3 py-1.5 border border-transparent text-slate-400 hover:text-white">ทำต่อ & Setup</a>
+      </nav>
+      <div class="mt-6 text-[11px] text-slate-500 leading-relaxed border-t border-white/5 pt-4">
+        PM: <span class="text-jade-300">Sandalphon</span><br>Build: <span class="text-bronze-300">Metatron</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== Main ===== -->
+  <main class="min-w-0 space-y-5">
+
+    <!-- Hero -->
+    <header class="glass rounded-3xl p-7 lg:p-9 relative overflow-hidden">
+      <div class="absolute -top-16 -right-10 h-48 w-48 rounded-full bg-jade-500/10 blur-3xl"></div>
+      <div class="flex flex-wrap items-center gap-2 mb-4">
+        <span class="chip text-xs px-2.5 py-1 rounded-full bg-jade-500/15 text-jade-300 border border-jade-500/20">v0.2</span>
+        <span class="chip text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-300 border border-white/10">👤 ใช้ส่วนตัว</span>
+        <span class="chip text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-300 border border-white/10">🟢 เปิด OA ใหม่</span>
+        <span class="chip text-xs px-2.5 py-1 rounded-full bg-bronze-400/15 text-bronze-300 border border-bronze-400/20">🛠️ กำลัง Dev</span>
+      </div>
+      <h1 class="font-display text-4xl lg:text-5xl font-bold text-white tracking-tight">EunJod <span class="text-slate-500 font-thai text-2xl lg:text-3xl">น้องจด</span></h1>
+      <p class="mt-3 text-slate-300 max-w-2xl leading-relaxed">บอท LINE ที่เข้าไปอยู่ใน <b class="text-white">กลุ่ม LINE</b> แล้วช่วย <b class="text-jade-300">จดรายรับ-รายจ่าย</b> จากข้อความที่พิมพ์ — แค่พิมพ์ <code class="text-jade-300 bg-jade-500/10 px-1.5 py-0.5 rounded">กาแฟ 50</code> ก็จดเป็นรายจ่าย 50 บาท หมวด <i>กิน &gt; เครื่องดื่ม</i> ให้อัตโนมัติ</p>
+      <div class="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        <div class="glass rounded-2xl py-3"><div class="text-2xl font-bold text-white">&lt;5<span class="text-sm text-slate-400">วิ</span></div><div class="text-[11px] text-slate-400">เวลาจด/รายการ</div></div>
+        <div class="glass rounded-2xl py-3"><div class="text-2xl font-bold text-white">&gt;80<span class="text-sm text-slate-400">%</span></div><div class="text-[11px] text-slate-400">จัดหมวดถูกเอง</div></div>
+        <div class="glass rounded-2xl py-3"><div class="text-2xl font-bold text-white">1:1</div><div class="text-[11px] text-slate-400">กลุ่ม = บัญชี</div></div>
+        <div class="glass rounded-2xl py-3"><div class="text-2xl font-bold text-white">~10–13</div><div class="text-[11px] text-slate-400">วัน-คน (MVP)</div></div>
+      </div>
+    </header>
+
+    <!-- TL;DR -->
+    <section id="tldr" class="glass rounded-3xl p-6 lg:p-8 scroll-mt-6">
+      <h2 class="font-display text-xl font-bold text-white mb-4 flex items-center gap-2"><span class="text-jade-400">▍</span>สรุปสั้น</h2>
+      <ul class="space-y-2.5 text-slate-300 text-[15px]">
+        <li class="flex gap-3"><span class="text-jade-400">●</span><span><b class="text-white">แต่ละกลุ่ม = หนึ่งบัญชี (เล่ม)</b> ตั้งด้วย <code class="text-jade-300">/setbook ชื่อบัญชี</code> ข้อมูลแยกกันสนิท ไม่ปนกัน</span></li>
+        <li class="flex gap-3"><span class="text-jade-400">●</span><span><b class="text-white">จัดหมวดอัตโนมัติ</b> ด้วยพจนานุกรมคำ + ปัญญาประดิษฐ์ (Claude) ช่วยตอนเจอคำใหม่ และ <b class="text-white">เรียนรู้</b> จากที่ผู้ใช้แก้</span></li>
+        <li class="flex gap-3"><span class="text-jade-400">●</span><span><b class="text-white">รายงานรายเดือน</b> พิมพ์ <code class="text-jade-300">รายงาน</code> ได้สรุปรายรับ-รายจ่าย-คงเหลือ แยกหมวด + ลิงก์หน้าเว็บที่มีกราฟ</span></li>
+        <li class="flex gap-3"><span class="text-jade-400">●</span><span>ฉลาดพอที่จะ <b class="text-white">เงียบ</b> เมื่อสมาชิกคุยเล่น (ข้อความที่ไม่มีตัวเลขเงิน บอทไม่จด)</span></li>
+      </ul>
+    </section>
+
+    <!-- Problem & Goals -->
+    <section id="problem" class="grid md:grid-cols-2 gap-5 scroll-mt-6">
+      <div class="glass rounded-3xl p-6 lg:p-7">
+        <h2 class="font-display text-lg font-bold text-white mb-3 flex items-center gap-2">😖 ปัญหา</h2>
+        <p class="text-slate-300 text-[15px] leading-relaxed">คนอยากรู้ว่า "เงินหายไปไหน" แต่เลิกจดบัญชีกลางคันเพราะ (1) ต้องเปิดแอปแยก (2) ต้องเลือกหมวดเองทุกครั้ง (3) ทำคนเดียว ครอบครัว/ทีมจดร่วมกันไม่ได้ → ไม่มีข้อมูลพอตัดสินใจ และคุมงบไม่ได้จริง</p>
+      </div>
+      <div class="glass rounded-3xl p-6 lg:p-7">
+        <h2 class="font-display text-lg font-bold text-white mb-3 flex items-center gap-2">🎯 เป้าหมาย</h2>
+        <ol class="space-y-2 text-slate-300 text-sm list-decimal list-inside marker:text-jade-400">
+          <li>จดได้ใน 1 ข้อความ ไม่ต้องเลือกหมวด (&lt; 5 วิ)</li>
+          <li>จัดหมวดถูกเอง &gt; 80% หลังเรียนรู้ ~2 สัปดาห์</li>
+          <li>แยกบัญชีต่อกลุ่มได้จริง 100%</li>
+          <li>เห็นภาพการเงินรายเดือนทันที</li>
+          <li>กลุ่มยังจดต่อหลัง 30 วัน (&gt; 50%)</li>
+        </ol>
+      </div>
+      <div class="glass rounded-3xl p-6 lg:p-7 md:col-span-2 border-rose-500/15">
+        <h2 class="font-display text-lg font-bold text-white mb-3 flex items-center gap-2">🚫 ไม่ทำในรอบนี้ (Non-Goals)</h2>
+        <div class="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-slate-400">
+          <div>• ไม่ทำโปรแกรมบัญชีเต็ม (งบดุล/ภาษี/ใบกำกับ) — นั่นคือ JR ERP</div>
+          <div>• ไม่รองรับหลายสกุลเงิน (บาทอย่างเดียว)</div>
+          <div>• ไม่ทำระบบขายหลายลูกค้า/คิดเงิน (ใช้ส่วนตัว)</div>
+          <div>• ไม่เดาข้อความที่ไม่มีตัวเลขเงิน</div>
+          <div>• ไม่ทำ OCR สลิป/บิล ใน v1 (เลื่อน Phase 4)</div>
+          <div>• โฟกัส "กลุ่ม" — แชต 1:1 ไม่ใช่ฟีเจอร์หลัก v1</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Flow -->
+    <section id="flow" class="glass rounded-3xl p-6 lg:p-8 scroll-mt-6">
+      <h2 class="font-display text-xl font-bold text-white mb-1 flex items-center gap-2"><span class="text-jade-400">▍</span>ระบบทำงานยังไง (ลำดับขั้น)</h2>
+      <p class="text-sm text-slate-400 mb-5">ตั้งแต่ผู้ใช้พิมพ์ จนบอทจดเสร็จและตอบกลับ</p>
+      <div class="rounded-2xl bg-black/20 p-3 overflow-x-auto">
+        <pre class="mermaid">
+sequenceDiagram
+    actor U as ผู้ใช้ (ในกลุ่ม)
+    participant L as LINE
+    participant W as Webhook (Vercel)
+    participant P as แยกข้อความ+จัดหมวด
+    participant AI as Claude (คำใหม่)
+    participant DB as Supabase
+    U->>L: พิมพ์ "กาแฟ 50"
+    L->>W: ส่ง event (groupId, userId, ข้อความ)
+    W->>W: ตรวจลายเซ็น LINE
+    W->>DB: groupId นี้ผูกบัญชีไหน?
+    DB-->>W: บัญชี "บ้านเรา"
+    W->>P: แยก → 50, "กาแฟ", รายจ่าย
+    P->>DB: หา "กาแฟ" ในพจนานุกรม
+    DB-->>P: กิน > เครื่องดื่ม
+    Note over P,AI: ไม่เจอค่อยถาม Claude แล้วจำไว้
+    P->>DB: บันทึก −50
+    W-->>L: การ์ด "✅ จด: กาแฟ −50 · กิน>เครื่องดื่ม"
+    L-->>U: ยืนยัน + ปุ่มแก้ไข
+        </pre>
+      </div>
+      <div class="mt-4 flex items-start gap-2 text-sm text-bronze-300 bg-bronze-400/5 rounded-xl p-3 border border-bronze-400/10">
+        <span>💡</span><span><b>กันจดมั่ว:</b> ถ้าข้อความไม่มีตัวเลขเงิน (เช่น "หิวจัง") บอท <b>เงียบ</b> ไม่จด ไม่ตอบ — สำคัญในกลุ่มที่คุยเล่นปนกัน</span>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="glass rounded-3xl p-6 lg:p-8 scroll-mt-6">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <h2 class="font-display text-xl font-bold text-white flex items-center gap-2"><span class="text-jade-400">▍</span>ฟีเจอร์ + เกณฑ์ยอมรับ</h2>
+        <div class="flex gap-1.5 text-xs" id="filterBar">
+          <button data-f="all" class="filter-btn px-3 py-1.5 rounded-lg bg-jade-500/20 text-jade-300 border border-jade-500/30">ทั้งหมด</button>
+          <button data-f="P0"  class="filter-btn px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 border border-white/10">P0 ต้องมี</button>
+          <button data-f="P1"  class="filter-btn px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 border border-white/10">P1 ควรมี</button>
+          <button data-f="P2"  class="filter-btn px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 border border-white/10">P2 อนาคต</button>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4" id="featureGrid">
+
+        <div data-priority="P0" class="feat glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-white">📝 จดรายการจากข้อความ</h3><span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">P0</span></div>
+          <p class="text-sm text-slate-400 mb-3">แยก จำนวนเงิน + รายการ + ชนิด (รับ/จ่าย) + โน้ต จากข้อความธรรมชาติ · รองรับ <code class="text-jade-300">5k</code>=5,000 · <code class="text-jade-300">+</code> = รายรับ · หลายรายการคั่น <code class="text-jade-300">,</code></p>
+          <ul class="text-xs text-slate-500 space-y-1">
+            <li>✓ <code>กาแฟ 50</code> → จ่าย 50 · <code>50 กาแฟ</code> สลับได้</li>
+            <li>✓ <code>+เงินเดือน 30000</code> → รับ 30,000</li>
+            <li>✓ <code>ข้าว 60 #ลูกค้า</code> → โน้ต "ลูกค้า"</li>
+            <li>✓ <code>หิวจัง</code> (ไม่มีเลข) → ไม่จด</li>
+          </ul>
+        </div>
+
+        <div data-priority="P0" class="feat glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-white">🏷️ จัดหมวดอัตโนมัติ</h3><span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">P0</span></div>
+          <p class="text-sm text-slate-400 mb-3">2 ระดับ (หมวดใหญ่ &gt; ย่อย) เป็นชั้น: พจนานุกรมบัญชีนี้ → กลาง → คำใกล้เคียง → ถาม Claude แล้วจำ → ไม่รู้ = "อื่นๆ"</p>
+          <ul class="text-xs text-slate-500 space-y-1">
+            <li>✓ กาแฟ → กิน &gt; เครื่องดื่ม</li>
+            <li>✓ ทางด่วน → เดินทาง &gt; ทางด่วน</li>
+            <li>✓ ชาจไฟ → เดินทาง &gt; น้ำมัน/ไฟ</li>
+          </ul>
+        </div>
+
+        <div data-priority="P0" class="feat glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-white">📒 ผูกกลุ่ม = บัญชี</h3><span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">P0</span></div>
+          <p class="text-sm text-slate-400 mb-3"><code class="text-jade-300">/setbook ชื่อ</code> ตั้งบัญชีของกลุ่ม · ทุก query อิงเฉพาะบัญชีนั้น · กลุ่มที่ยังไม่ตั้ง บอทเตือนก่อน (ยังไม่จด)</p>
+          <ul class="text-xs text-slate-500 space-y-1"><li>✓ 2 กลุ่มจดคำเดียวกัน ยอดแยกเล่มสนิท</li><li>✓ <code>/book</code> แสดงชื่อ + จำนวนรายการเดือนนี้</li></ul>
+        </div>
+
+        <div data-priority="P0" class="feat glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-white">✏️ แก้ไข / ลบ</h3><span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">P0</span></div>
+          <p class="text-sm text-slate-400 mb-3"><code class="text-jade-300">ลบ</code> ถอนล่าสุด · <code class="text-jade-300">แก้ 60</code> แก้ยอด · <code class="text-jade-300">แก้หมวด เดินทาง</code> แก้หมวดล่าสุด</p>
+          <ul class="text-xs text-slate-500 space-y-1"><li>✓ ลบแล้วยอดรวมรายงานเปลี่ยนตาม</li></ul>
+        </div>
+
+        <div data-priority="P0" class="feat glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-white">📊 รายงาน</h3><span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">P0</span> <span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">กราฟ=P1</span></div>
+          <p class="text-sm text-slate-400 mb-3"><code class="text-jade-300">วันนี้</code> / <code class="text-jade-300">เดือนนี้</code> / <code class="text-jade-300">รายงาน</code> → การ์ดสรุป (รายรับ/จ่าย/คงเหลือ/Top หมวด) + ลิงก์เว็บกราฟ + <code class="text-jade-300">/export</code> CSV</p>
+        </div>
+
+        <div data-priority="P1" class="feat glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-white">🧠 เรียนรู้หมวด</h3><span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">P1</span></div>
+          <p class="text-sm text-slate-400 mb-3"><code class="text-jade-300">แก้หมวด</code> / <code class="text-jade-300">/cat ชานม = กิน &gt; เครื่องดื่ม</code> → บอทจำต่อกลุ่ม ครั้งหน้าถูกเอง</p>
+        </div>
+
+        <div data-priority="P1" class="feat glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-white">💰 งบ + เตือน</h3><span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">P1</span></div>
+          <p class="text-sm text-slate-400 mb-3"><code class="text-jade-300">/budget กิน 5000</code> ตั้งงบรายเดือน · เตือนเมื่อใช้ถึง 80% และ 100%</p>
+        </div>
+
+        <div data-priority="P1" class="feat glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-white">🔔 สรุปอัตโนมัติ</h3><span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">P1</span></div>
+          <p class="text-sm text-slate-400 mb-3">โพสต์สรุปยอดเข้ากลุ่มทุกสิ้นวัน (เช่น 21:00) + สรุปเดือนทุกวันที่ 1 · เปิด/ปิดด้วย <code class="text-jade-300">/digest</code></p>
+        </div>
+
+        <div data-priority="P2" class="feat glass rounded-2xl p-5 opacity-90">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-white">🚀 ต่อยอด (อนาคต)</h3><span class="text-[10px] px-2 py-0.5 rounded bg-slate-500/20 text-slate-300">P2</span></div>
+          <p class="text-sm text-slate-400">OCR สลิป/บิล · รายการประจำ (recurring) · หารบิล (split) · หลายสกุลเงิน · เข้าเว็บด้วย LINE Login · ผูก Google Sheets</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Functions -->
+    <section id="functions" class="glass rounded-3xl p-6 lg:p-8 scroll-mt-6">
+      <h2 class="font-display text-xl font-bold text-white mb-1 flex items-center gap-2"><span class="text-jade-400">▍</span>ฟังก์ชันใช้งาน (พิมพ์น้อย ได้เยอะ)</h2>
+      <p class="text-sm text-slate-400 mb-5">ออกแบบให้ใช้ง่ายตามที่ต้นขอ</p>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="rounded-2xl bg-black/20 p-4">
+          <div class="text-jade-300 font-semibold text-sm mb-2">📝 จด (แค่พิมพ์ ไม่ต้องมีคำสั่ง)</div>
+          <table class="w-full text-sm"><tbody class="divide-y divide-white/5">
+            <tr><td class="py-1.5 pr-2"><code class="text-white">กาแฟ 50</code></td><td class="text-slate-400">รายจ่าย 50 + จัดหมวด</td></tr>
+            <tr><td class="py-1.5 pr-2"><code class="text-white">+เงินเดือน 30000</code></td><td class="text-slate-400">รายรับ 30,000</td></tr>
+            <tr><td class="py-1.5 pr-2"><code class="text-white">ข้าว 60, ทางด่วน 80</code></td><td class="text-slate-400">จด 2 รายการรวด</td></tr>
+            <tr><td class="py-1.5 pr-2"><code class="text-white">หนัง 300 #เดท</code></td><td class="text-slate-400">จ่าย 300 + โน้ต</td></tr>
+          </tbody></table>
+        </div>
+        <div class="rounded-2xl bg-black/20 p-4">
+          <div class="text-jade-300 font-semibold text-sm mb-2">✏️ แก้ไขด่วน</div>
+          <table class="w-full text-sm"><tbody class="divide-y divide-white/5">
+            <tr><td class="py-1.5 pr-2"><code class="text-white">ลบ</code></td><td class="text-slate-400">ถอนล่าสุด</td></tr>
+            <tr><td class="py-1.5 pr-2"><code class="text-white">แก้ 70</code></td><td class="text-slate-400">แก้ยอดล่าสุด</td></tr>
+            <tr><td class="py-1.5 pr-2"><code class="text-white">แก้หมวด เดินทาง</code></td><td class="text-slate-400">แก้หมวด + บอทจำ</td></tr>
+          </tbody></table>
+        </div>
+        <div class="rounded-2xl bg-black/20 p-4">
+          <div class="text-jade-300 font-semibold text-sm mb-2">📊 ดูข้อมูล (คำเดียว)</div>
+          <p class="text-sm text-slate-400 leading-7"><code class="text-white">วันนี้</code> · <code class="text-white">เดือนนี้</code> · <code class="text-white">สรุป</code> · <code class="text-white">รายงาน</code> · <code class="text-white">หมวด กิน</code> · <code class="text-white">ค้นหา กาแฟ</code> · <code class="text-white">งบ</code></p>
+        </div>
+        <div class="rounded-2xl bg-black/20 p-4">
+          <div class="text-jade-300 font-semibold text-sm mb-2">⚙️ ตั้งค่า (ขึ้นต้น /)</div>
+          <p class="text-sm text-slate-400 leading-7"><code class="text-white">/setbook บ้านเรา</code> · <code class="text-white">/book</code> · <code class="text-white">/budget กิน 5000</code> · <code class="text-white">/cat ชานม = กิน &gt; เครื่องดื่ม</code> · <code class="text-white">/digest on 21:00</code> · <code class="text-white">/export</code> · <code class="text-white">/help</code></p>
+        </div>
+      </div>
+      <div class="mt-4 grid sm:grid-cols-3 gap-3 text-sm">
+        <div class="rounded-xl bg-jade-500/5 border border-jade-500/10 p-3 text-slate-300">✅ การ์ดยืนยันทุกครั้ง + ปุ่มแก้ด่วน</div>
+        <div class="rounded-xl bg-jade-500/5 border border-jade-500/10 p-3 text-slate-300">🔕 เงียบเมื่อคุยเล่น (ไม่มีเลข)</div>
+        <div class="rounded-xl bg-jade-500/5 border border-jade-500/10 p-3 text-slate-300">🧠 เรียนรู้ต่อกลุ่ม ยิ่งใช้ยิ่งแม่น</div>
+      </div>
+    </section>
+
+    <!-- Taxonomy -->
+    <section id="taxonomy" class="glass rounded-3xl p-6 lg:p-8 scroll-mt-6">
+      <h2 class="font-display text-xl font-bold text-white mb-5 flex items-center gap-2"><span class="text-jade-400">▍</span>หมวดหมู่เริ่มต้น</h2>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-white mb-1">🍜 กิน</div><div class="text-slate-400 text-xs">อาหาร · เครื่องดื่ม · ขนม/ของว่าง</div></div>
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-white mb-1">🚗 เดินทาง</div><div class="text-slate-400 text-xs">น้ำมัน/ไฟ · ทางด่วน · ที่จอดรถ · แท็กซี่/Grab · ขนส่งสาธารณะ</div></div>
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-white mb-1">🛍️ ช้อปปิ้ง</div><div class="text-slate-400 text-xs">ของใช้ · เสื้อผ้า · ของฝาก</div></div>
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-white mb-1">🏠 บ้าน/บิล</div><div class="text-slate-400 text-xs">ค่าน้ำ-ไฟ · เน็ต/มือถือ · ค่าเช่า</div></div>
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-white mb-1">💊 สุขภาพ</div><div class="text-slate-400 text-xs">ยา/หมอ · ออกกำลังกาย</div></div>
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-white mb-1">🎬 บันเทิง</div><div class="text-slate-400 text-xs">ดูหนัง/สตรีมมิง · เกม/งานอดิเรก</div></div>
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-white mb-1">👨‍👩‍👧 ครอบครัว · 💼 งาน · ❓ อื่นๆ</div><div class="text-slate-400 text-xs">หมวดใหญ่เดี่ยว</div></div>
+        <div class="rounded-2xl bg-jade-500/5 border border-jade-500/10 p-4 sm:col-span-2"><div class="font-semibold text-jade-300 mb-1">💵 รายรับ</div><div class="text-slate-400 text-xs">เงินเดือน · ขายของ/รายได้ · โบนัส · เงินคืน/ดอกเบี้ย · อื่นๆ</div></div>
+      </div>
+      <p class="text-xs text-slate-500 mt-3">พจนานุกรมคำเต็ม + ตัวอย่างคีย์เวิร์ด ดูที่ <code class="text-jade-300">categories.seed.md</code> (จะ seed ลง Supabase ตอนสร้างจริง)</p>
+    </section>
+
+    <!-- Architecture & Data -->
+    <section id="arch" class="grid lg:grid-cols-2 gap-5 scroll-mt-6">
+      <div class="glass rounded-3xl p-6 lg:p-7">
+        <h2 class="font-display text-lg font-bold text-white mb-4 flex items-center gap-2">🏗️ สถาปัตยกรรม</h2>
+        <ul class="space-y-2.5 text-sm text-slate-300">
+          <li class="flex gap-2"><span class="text-jade-400 shrink-0">▸</span><span><b class="text-white">LINE Messaging API</b> (OA ใหม่ + webhook, ปิด auto-reply, อนุญาตเข้ากลุ่ม)</span></li>
+          <li class="flex gap-2"><span class="text-jade-400 shrink-0">▸</span><span><b class="text-white">Next.js (App Router) บน Vercel</b> — <code class="text-jade-300 text-xs">app/api/line/webhook</code> ตรวจลายเซ็น HMAC-SHA256</span></li>
+          <li class="flex gap-2"><span class="text-jade-400 shrink-0">▸</span><span><b class="text-white">Supabase (Postgres)</b> — บัญชี/รายการ/หมวด/พจนานุกรม/งบ</span></li>
+          <li class="flex gap-2"><span class="text-jade-400 shrink-0">▸</span><span><b class="text-white">Claude Haiku</b> จัดหมวดเฉพาะคำใหม่แล้ว cache → ค่า API ต่ำ</span></li>
+          <li class="flex gap-2"><span class="text-jade-400 shrink-0">▸</span><span><b class="text-white">Vercel Cron</b> → push สรุปสิ้นวัน/เดือน</span></li>
+        </ul>
+        <p class="text-xs text-slate-500 mt-4 border-t border-white/5 pt-3">เลือก stack เดียวกับ JR ERP / TONPALEARN — รีไซเคิลความรู้/แพตเทิร์นเดิม</p>
+      </div>
+      <div class="glass rounded-3xl p-6 lg:p-7">
+        <h2 class="font-display text-lg font-bold text-white mb-4 flex items-center gap-2">🗄️ โครงสร้างข้อมูล</h2>
+        <ul class="space-y-2 text-sm text-slate-300 font-mono text-xs leading-relaxed">
+          <li><b class="text-jade-300">ledgers</b> — กลุ่ม ↔ บัญชี (line_group_id, name, tz)</li>
+          <li><b class="text-jade-300">categories</b> — หมวด 2 ระดับ (parent_id, type)</li>
+          <li><b class="text-jade-300">keywords</b> — คำ → หมวด (source: seed/llm/user) ★หัวใจ</li>
+          <li><b class="text-jade-300">transactions</b> — รายการ (amount, type, item, note, soft-delete)</li>
+          <li><b class="text-jade-300">budgets</b> — งบรายเดือนต่อหมวด</li>
+          <li><b class="text-jade-300">report_tokens</b> — ลิงก์เว็บรายงาน (หมดอายุได้)</li>
+        </ul>
+        <div class="mt-4 flex flex-wrap gap-2 text-xs">
+          <span class="px-2 py-1 rounded bg-white/5 text-slate-400">🔐 ตรวจลายเซ็น LINE</span>
+          <span class="px-2 py-1 rounded bg-white/5 text-slate-400">🔒 แยกด้วย ledger_id</span>
+          <span class="px-2 py-1 rounded bg-white/5 text-slate-400">⚖️ PDPA: /export · /forget</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Roadmap -->
+    <section id="roadmap" class="glass rounded-3xl p-6 lg:p-8 scroll-mt-6">
+      <h2 class="font-display text-xl font-bold text-white mb-6 flex items-center gap-2"><span class="text-jade-400">▍</span>โรดแมป</h2>
+      <div class="space-y-4">
+        <div class="flex gap-4">
+          <div class="shrink-0 w-16 text-center"><div class="h-10 w-10 mx-auto rounded-full bg-jade-500/20 text-jade-300 grid place-items-center font-bold border border-jade-500/30">0</div><div class="text-[10px] text-slate-500 mt-1">2–3 วัน</div></div>
+          <div class="glass rounded-2xl p-4 flex-1"><div class="font-semibold text-white text-sm">วางราก</div><div class="text-xs text-slate-400 mt-1">LINE OA + schema Supabase + โครง Next.js + webhook + ตรวจลายเซ็น + echo</div></div>
+        </div>
+        <div class="flex gap-4">
+          <div class="shrink-0 w-16 text-center"><div class="h-10 w-10 mx-auto rounded-full bg-jade-500/20 text-jade-300 grid place-items-center font-bold border border-jade-500/30">1</div><div class="text-[10px] text-slate-500 mt-1">4–5 วัน</div></div>
+          <div class="glass rounded-2xl p-4 flex-1"><div class="font-semibold text-white text-sm">MVP จดได้จริง <span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 ml-1">P0</span></div><div class="text-xs text-slate-400 mt-1">แยกข้อความ + จัดหมวด + /setbook + บันทึก + การ์ดยืนยัน + ลบ/แก้</div></div>
+        </div>
+        <div class="flex gap-4">
+          <div class="shrink-0 w-16 text-center"><div class="h-10 w-10 mx-auto rounded-full bg-jade-500/20 text-jade-300 grid place-items-center font-bold border border-jade-500/30">2</div><div class="text-[10px] text-slate-500 mt-1">4–5 วัน</div></div>
+          <div class="glass rounded-2xl p-4 flex-1"><div class="font-semibold text-white text-sm">รายงาน</div><div class="text-xs text-slate-400 mt-1">วันนี้/เดือนนี้/รายงาน + การ์ด Flex + หน้าเว็บกราฟ + /export</div></div>
+        </div>
+        <div class="flex gap-4">
+          <div class="shrink-0 w-16 text-center"><div class="h-10 w-10 mx-auto rounded-full bg-bronze-400/15 text-bronze-300 grid place-items-center font-bold border border-bronze-400/20">3</div><div class="text-[10px] text-slate-500 mt-1">4–6 วัน</div></div>
+          <div class="glass rounded-2xl p-4 flex-1"><div class="font-semibold text-white text-sm">ฉลาดขึ้น <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 ml-1">P1</span></div><div class="text-xs text-slate-400 mt-1">Claude จัดหมวด + เรียนรู้ + งบ/เตือน + สรุปอัตโนมัติ (cron)</div></div>
+        </div>
+        <div class="flex gap-4">
+          <div class="shrink-0 w-16 text-center"><div class="h-10 w-10 mx-auto rounded-full bg-slate-500/15 text-slate-300 grid place-items-center font-bold border border-slate-500/20">4</div><div class="text-[10px] text-slate-500 mt-1">backlog</div></div>
+          <div class="glass rounded-2xl p-4 flex-1"><div class="font-semibold text-white text-sm">ต่อยอด <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-300 ml-1">P2</span></div><div class="text-xs text-slate-400 mt-1">OCR · recurring · หารบิล · หลายสกุลเงิน · LINE Login · Google Sheets</div></div>
+        </div>
+      </div>
+      <p class="text-sm text-jade-300 mt-5 text-center bg-jade-500/5 rounded-xl py-2.5 border border-jade-500/10">MVP ใช้งานได้จริง (เฟส 0–2) ≈ <b>10–13 วัน-คน</b></p>
+    </section>
+
+    <!-- Decisions & Risks -->
+    <section id="decisions" class="grid lg:grid-cols-2 gap-5 scroll-mt-6">
+      <div class="glass rounded-3xl p-6 lg:p-7">
+        <h2 class="font-display text-lg font-bold text-white mb-4 flex items-center gap-2">✅ การตัดสินใจ</h2>
+        <div class="space-y-3 text-sm">
+          <div class="rounded-xl bg-jade-500/5 border border-jade-500/10 p-3"><b class="text-jade-300">ใช้งานส่วนตัว/ครอบครัว</b><div class="text-slate-400 text-xs mt-1">v1 ไม่ทำระบบขาย/คิดเงิน · ยังรองรับหลายกลุ่ม=หลายบัญชีของต้นเอง</div></div>
+          <div class="rounded-xl bg-jade-500/5 border border-jade-500/10 p-3"><b class="text-jade-300">เปิด LINE OA ใหม่</b><div class="text-slate-400 text-xs mt-1">แยกจาก OA ส่งข่าว เพราะต้องอ่านทุกข้อความในกลุ่ม</div></div>
+          <div class="text-xs text-slate-500 pt-1">ยังเปิด: ชื่อแบรนด์ · API ตรง vs Gateway (เริ่มตรงก่อน) · สิทธิ์ในกลุ่ม (v1 ทุกคนทำได้)</div>
+        </div>
+      </div>
+      <div class="glass rounded-3xl p-6 lg:p-7">
+        <h2 class="font-display text-lg font-bold text-white mb-4 flex items-center gap-2">⚠️ ความเสี่ยง + ทางลด</h2>
+        <ul class="space-y-2.5 text-sm text-slate-400">
+          <li><b class="text-slate-200">ตั้งค่า LINE ผิด</b> → เช็กลิสต์ Setup + ทดสอบ Phase 0</li>
+          <li><b class="text-slate-200">จัดหมวด/แยกยอดผิด</b> → การ์ดยืนยัน + แก้ง่าย + เรียนรู้</li>
+          <li><b class="text-slate-200">จดมั่วตอนคุยเล่น</b> → ต้องมีเลขถึงจะจด</li>
+          <li><b class="text-slate-200">ค่า AI บานปลาย</b> → cache พจนานุกรม + Haiku + ถามเฉพาะคำใหม่</li>
+          <li><b class="text-slate-200">ข้อมูลรั่ว (PDPA)</b> → แยก ledger + token หมดอายุ + /forget</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Next & Setup -->
+    <section id="next" class="glass rounded-3xl p-6 lg:p-8 scroll-mt-6">
+      <h2 class="font-display text-xl font-bold text-white mb-5 flex items-center gap-2"><span class="text-jade-400">▍</span>ทำอะไรต่อ & Setup</h2>
+      <div class="overflow-x-auto mb-6">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-slate-400 border-b border-white/10"><th class="py-2 pr-3 font-medium">งาน</th><th class="py-2 pr-3 font-medium">เจ้าของ</th><th class="py-2 font-medium">สถานะ</th></tr></thead>
+          <tbody class="divide-y divide-white/5 text-slate-300">
+            <tr><td class="py-2 pr-3">เคาะทิศ: ส่วนตัว + OA ใหม่</td><td class="py-2 pr-3 text-slate-400">ต้น</td><td class="py-2 text-jade-300">✅ เสร็จ</td></tr>
+            <tr><td class="py-2 pr-3">เขียนสเปก + SPEC.html</td><td class="py-2 pr-3 text-slate-400">Sandalphon</td><td class="py-2 text-jade-300">✅ เสร็จ</td></tr>
+            <tr><td class="py-2 pr-3">Dev Phase 0–1 (scaffold + parser + จัดหมวด + webhook + จด/ลบ/แก้ + รายงาน)</td><td class="py-2 pr-3 text-slate-400">Metatron</td><td class="py-2 text-bronze-300">🛠️ กำลังทำ</td></tr>
+            <tr><td class="py-2 pr-3">เปิด LINE OA ใหม่ → ใส่ token</td><td class="py-2 pr-3 text-slate-400">ต้น</td><td class="py-2 text-slate-400">⏳ รอ</td></tr>
+            <tr><td class="py-2 pr-3">สร้าง Supabase + รัน migration</td><td class="py-2 pr-3 text-slate-400">ต้น</td><td class="py-2 text-slate-400">⏳ รอ</td></tr>
+            <tr><td class="py-2 pr-3">Deploy Vercel + ตั้ง Webhook URL</td><td class="py-2 pr-3 text-slate-400">Metatron</td><td class="py-2 text-slate-400">⏳ หลังมี token</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-jade-300 text-sm mb-2">1 · LINE OA ใหม่</div><ol class="text-xs text-slate-400 space-y-1 list-decimal list-inside">
+          <li>LINE Developers → Messaging API channel "EunJod"</li><li>เก็บ Channel access token + secret</li><li>ตั้ง Webhook URL = <code>/api/line/webhook</code> + เปิด Use webhook</li><li>ปิด auto-reply · เปิด <b>Allow join group</b></li></ol></div>
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-jade-300 text-sm mb-2">2 · Supabase</div><ol class="text-xs text-slate-400 space-y-1 list-decimal list-inside">
+          <li>New project</li><li>เก็บ URL + service_role key</li><li>รัน SQL ใน <code>supabase/migrations/</code></li></ol></div>
+        <div class="rounded-2xl bg-black/20 p-4"><div class="font-semibold text-jade-300 text-sm mb-2">3 · รัน</div><ol class="text-xs text-slate-400 space-y-1 list-decimal list-inside">
+          <li>คัด <code>.env.example</code> → <code>.env.local</code></li><li><code>npm install &amp;&amp; npm run dev</code></li><li><code>vercel</code> deploy → เอา URL ไปใส่ที่ LINE</li></ol></div>
+      </div>
+    </section>
+
+    <footer class="text-center text-xs text-slate-600 py-8">
+      EunJod (น้องจด) · Spec v0.2 · 2026-06-21 · 📌 Living Document — แก้ตอน dev ต้องอัปเดตที่นี่เสมอ<br>
+      สภาอัครเทวฑูต Angiris Council · PM: Sandalphon · Build: Metatron
+    </footer>
+  </main>
+</div>
+
+<script>
+  // Mermaid
+  try { mermaid.initialize({ startOnLoad:true, theme:'dark', themeVariables:{ fontFamily:'IBM Plex Sans Thai', primaryColor:'#0f2a28', primaryBorderColor:'#2dd4bf', lineColor:'#64748b', actorBkg:'#0f2a28', actorBorder:'#2dd4bf', signalColor:'#94a3b8', signalTextColor:'#cbd5e1' } }); } catch(e){}
+
+  // Scrollspy
+  const navLinks = [...document.querySelectorAll('.nav-link')];
+  navLinks.forEach(a => a.addEventListener('click', e => { e.preventDefault(); document.getElementById(a.dataset.nav)?.scrollIntoView({behavior:'smooth', block:'start'}); }));
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach(en => {
+      if (en.isIntersecting) {
+        const id = en.target.id;
+        navLinks.forEach(a => a.classList.toggle('active', a.dataset.nav === id));
+      }
+    });
+  }, { rootMargin: '-35% 0px -60% 0px' });
+  ['tldr','problem','flow','features','functions','taxonomy','arch','roadmap','decisions','next'].forEach(id => { const el = document.getElementById(id); if (el) spy.observe(el); });
+
+  // Priority filter
+  const btns = [...document.querySelectorAll('.filter-btn')];
+  btns.forEach(b => b.addEventListener('click', () => {
+    const f = b.dataset.f;
+    btns.forEach(x => { const on = x===b; x.classList.toggle('bg-jade-500/20', on); x.classList.toggle('text-jade-300', on); x.classList.toggle('border-jade-500/30', on); x.classList.toggle('bg-white/5', !on); x.classList.toggle('text-slate-400', !on); x.classList.toggle('border-white/10', !on); });
+    document.querySelectorAll('.feat').forEach(el => { el.style.display = (f==='all' || el.dataset.priority===f) ? '' : 'none'; });
+  }));
+</script>
+</body>
+</html>
