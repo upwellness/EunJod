@@ -90,6 +90,7 @@ export async function handleText(input: MsgInput): Promise<LineMessage[] | null>
 
   // ── คำสั่งดูข้อมูล/แก้ไข ──
   if (t === "ลบ" || lower === "undo" || t === "ยกเลิก") return [await handleDelete(ledger)];
+  if (lower === "/edit" || t === "แก้รายการ" || t === "แก้ไขรายการ" || t === "รายการ") return [await handleEditList(ledger)];
   if (t.startsWith("แก้หมวด")) return [await handleEditCategory(ledger, t.slice("แก้หมวด".length).trim())];
   if (t.startsWith("แก้")) return [await handleEditAmount(ledger, t.slice("แก้".length).trim())];
 
@@ -228,6 +229,23 @@ async function handleSetBudget(ledger: Ledger, t: string): Promise<LineMessage> 
   return m(`💰 ตั้งงบ "${cat}" = ${formatTHB(amount)} บาท/เดือน แล้ว`);
 }
 
+async function handleEditList(ledger: Ledger): Promise<LineMessage> {
+  let link = "";
+  try {
+    const token = await repo.createReportToken(ledger.id);
+    const base = process.env.APP_BASE_URL || "";
+    if (base) link = `${base}/tx/${token}`;
+  } catch {
+    /* ไม่มีลิงก์ก็แจ้งได้ */
+  }
+  return m(
+    link
+      ? `📝 แก้ไขรายการที่จดไว้ (เปลี่ยนหมวด · แก้ยอด/ชื่อ/วัน · ลบ) — กดลิงก์:\n${link}`
+      : "📝 แก้ไขรายการผ่านหน้าเว็บ — ระบบยังสร้างลิงก์ไม่ได้ตอนนี้",
+    DEFAULT_QUICK,
+  );
+}
+
 async function handleEditCat(ledger: Ledger): Promise<LineMessage> {
   let link = "";
   try {
@@ -330,6 +348,7 @@ function helpMessage(): LineMessage {
       "✏️ แก้: ลบ · แก้ 70 · แก้หมวด เดินทาง",
       "📊 ดู: วันนี้ · เดือนนี้ · รายงาน · งบ",
       "   หมวด กิน · ค้นหา กาแฟ · /cats (ดูหมวดทั้งหมด)",
+      "📝 /edit — แก้ไขรายการที่จดแล้ว (เปลี่ยนหมวด/แก้ยอด/ลบ)",
       "🏷️ /review — จัดหมวดรายการที่ยังไม่รู้ (อื่นๆ)",
       "🗂️ /editcat — จัดการหมวด (เปลี่ยนชื่อ/เพิ่ม/ซ่อน/ย้าย)",
       "",

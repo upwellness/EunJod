@@ -110,6 +110,18 @@ export async function uncategorizedTx(ledgerId: string, limit = 100): Promise<Tx
   return (data as TxRow[]) ?? [];
 }
 
+/** รายการล่าสุด (ทุกหมวด) สำหรับหน้าแก้ไขรายการ */
+export async function recentTx(ledgerId: string, limit = 60): Promise<TxRow[]> {
+  const { data } = await db()
+    .from("transactions")
+    .select("*")
+    .eq("ledger_id", ledgerId)
+    .is("deleted_at", null)
+    .order("occurred_at", { ascending: false })
+    .limit(limit);
+  return (data as TxRow[]) ?? [];
+}
+
 /** ดึงรายการเฉพาะที่เป็นของ ledger นี้ (กันแก้ข้ามบัญชี) */
 export async function getTxForLedger(id: string, ledgerId: string): Promise<TxRow | null> {
   const { data } = await db()
