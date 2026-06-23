@@ -9,7 +9,7 @@ import { readConfig, effectiveGroups, summaryFromGroups, applyRename } from "./c
 import { llmCategorize } from "./anthropic";
 import { signed, formatTHB } from "./money";
 import { text, DEFAULT_QUICK, type LineMessage } from "./line";
-import { localRange, aggregate, formatSummary, makeOccurredAt, thaiDate, type RangeKind } from "./reports";
+import { localRange, aggregate, formatSummary, formatDailyDetail, makeOccurredAt, thaiDate, type RangeKind } from "./reports";
 import * as repo from "./db";
 import type { Ledger, TxRow } from "./types";
 
@@ -96,8 +96,8 @@ export async function handleText(input: MsgInput): Promise<LineMessage[] | null>
 
   if (t === "เดือนนี้") return [await report(ledger, "month")];
   if (t === "เดือนที่แล้ว") return [await report(ledger, "lastmonth")];
-  if (t === "วันนี้") return [await report(ledger, "today")];
-  if (t === "เมื่อวาน") return [await report(ledger, "yesterday")];
+  if (t === "วันนี้" || t === "สิ้นวัน" || t === "สรุปวันนี้") return [await reportDetail(ledger, "today")];
+  if (t === "เมื่อวาน") return [await reportDetail(ledger, "yesterday")];
   if (t === "สรุป") return [await report(ledger, "month")];
   if (t === "รายงาน") return [await report(ledger, "month", true)];
   if (lower === "/review" || t === "รีวิว" || t === "จัดหมวด" || t === "ตรวจหมวด") return [await handleReview(ledger)];
@@ -284,6 +284,12 @@ async function handleBook(ledger: Ledger): Promise<LineMessage> {
 }
 
 // ── รายงาน / หมวด / ค้นหา ───────────────────────────────────────────────────────
+async function reportDetail(ledger: Ledger, kind: RangeKind): Promise<LineMessage> {
+  const r = localRange(ledger.timezone, kind);
+  const txs = await repo.txInRange(ledger.id, r.start.toISOString(), r.end.toISOString());
+  return m(formatDailyDetail(r.label, ledger.name, txs), DEFAULT_QUICK);
+}
+
 async function report(ledger: Ledger, kind: RangeKind, withLink = false): Promise<LineMessage> {
   const r = localRange(ledger.timezone, kind);
   const txs = await repo.txInRange(ledger.id, r.start.toISOString(), r.end.toISOString());

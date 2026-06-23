@@ -8,6 +8,8 @@ import { parseMessage } from "../src/lib/parser";
 import { SEED } from "../src/data/categories.seed";
 import { buildDictionary, categorizeLocal, fallbackCat, catLabel, categoriesSummary, categoryGroups } from "../src/lib/categorize";
 import { readConfig, applyRename, effectiveGroups, summaryFromGroups, type CatConfig } from "../src/lib/categories";
+import { formatDailyDetail } from "../src/lib/reports";
+import type { TxRow } from "../src/lib/types";
 
 const dict = buildDictionary(SEED);
 let pass = 0;
@@ -134,6 +136,24 @@ console.log("\n[6] จัดการหมวด (rename/add/hide)");
   check("hide: ไม่มี 'บันเทิง'", !g.some((x) => x.cat === "บันเทิง"));
   check("summaryFromGroups โชว์ชื่อใหม่", summaryFromGroups(g).includes("กินดื่ม"));
   check("readConfig ค่าว่าง -> empty", readConfig({}).added.length === 0 && Object.keys(readConfig(undefined).renames).length === 0);
+}
+
+console.log("\n[7] สรุปสิ้นวันแบบลงรายการ");
+{
+  const mk = (o: Partial<TxRow>): TxRow => ({
+    id: "x", ledger_id: "l", user_id: null, display_name: null, type: "expense", amount: 0,
+    item: "", cat: null, sub: null, note: null, occurred_at: "", source_message_id: null,
+    raw_text: null, created_at: "", deleted_at: null, ...o,
+  });
+  const txs = [
+    mk({ type: "expense", amount: 50, item: "กาแฟ", cat: "กิน", sub: "เครื่องดื่ม" }),
+    mk({ type: "expense", amount: 60, item: "ข้าว", cat: "กิน", sub: "อาหาร" }),
+    mk({ type: "income", amount: 30000, item: "เงินเดือน", cat: "เงินเดือน" }),
+  ];
+  const s = formatDailyDetail("วันนี้", "บ้าน", txs);
+  check("ลงรายการแยกหมวด: มี กาแฟ/ข้าว + หมวด กิน", s.includes("กาแฟ") && s.includes("ข้าว") && s.includes("กิน"));
+  check("มีรายรับ + รวมจ่าย/รวมรับ/คงเหลือ", s.includes("เงินเดือน") && s.includes("รวมจ่าย") && s.includes("รวมรับ") && s.includes("คงเหลือ"));
+  check("ว่าง -> ยังไม่มีรายการ", formatDailyDetail("วันนี้", "บ้าน", []).includes("ยังไม่มีรายการ"));
 }
 
 console.log(`\n=========== ผลรวม: ${pass} ผ่าน / ${fail} ตก ===========\n`);

@@ -94,6 +94,48 @@ export function aggregate(txs: TxRow[]): Summary {
   };
 }
 
+/** สรุปสิ้นวันแบบลงรายการ: เรียงแยกหมวด + ลิสต์ทุกรายการใต้หมวด + ยอดย่อย/รวม */
+export function formatDailyDetail(label: string, ledgerName: string, txs: TxRow[]): string {
+  const lines: string[] = [`📅 ${label} · บัญชี "${ledgerName}"`];
+  if (txs.length === 0) {
+    lines.push("", "ยังไม่มีรายการ");
+    return lines.join("\n");
+  }
+
+  const section = (type: "income" | "expense", header: string, sign: string) => {
+    const groups = new Map<string, TxRow[]>();
+    for (const t of txs) {
+      if (t.type !== type) continue;
+      const key = t.sub ? `${t.cat} > ${t.sub}` : t.cat || "อื่นๆ";
+      const arr = groups.get(key) ?? [];
+      arr.push(t);
+      groups.set(key, arr);
+    }
+    if (groups.size === 0) return;
+    lines.push("", header);
+    const entries = [...groups.entries()]
+      .map(([k, arr]) => ({ k, arr, sum: arr.reduce((s, t) => s + Number(t.amount), 0) }))
+      .sort((a, b) => b.sum - a.sum);
+    for (const g of entries) {
+      lines.push(`▸ ${g.k} (${sign}${formatTHB(g.sum)})`);
+      for (const t of g.arr) {
+        lines.push(`   • ${t.item} ${sign}${formatTHB(Number(t.amount))}${t.note ? ` #${t.note}` : ""}`);
+      }
+    }
+  };
+
+  section("expense", "💸 รายจ่าย", "−");
+  section("income", "💵 รายรับ", "+");
+
+  const exp = txs.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
+  const inc = txs.filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
+  const net = inc - exp;
+  lines.push("", "──────────");
+  lines.push(`รวมจ่าย −${formatTHB(exp)}${inc ? ` · รวมรับ +${formatTHB(inc)}` : ""}`);
+  lines.push(`คงเหลือ ${net >= 0 ? "+" : "−"}${formatTHB(Math.abs(net))} · ${txs.length} รายการ`);
+  return lines.join("\n");
+}
+
 export function formatSummary(label: string, ledgerName: string, s: Summary, extraLink?: string): string {
   const lines: string[] = [];
   lines.push(`📊 ${label} · บัญชี "${ledgerName}"`);
