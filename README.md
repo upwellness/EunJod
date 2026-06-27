@@ -69,3 +69,4 @@ npm run dev                     # เปิดเว็บ + webhook ที่ h
 4. เปิด **Allow bot to join group chats** + ปิด auto-reply → ชวนบอทเข้ากลุ่ม → `/setbook`
 
 รายละเอียดเต็ม: [`SPEC.md`](SPEC.md) · [`SPEC.html`](SPEC.html) · พจนานุกรมหมวด: [`categories.seed.md`](categories.seed.md)
+**กลับมาทำต่อ:** อ่าน [`PROGRESS.md`](PROGRESS.md) — สถานะ · วิธีรัน/ deploy · gotchas · backlog
